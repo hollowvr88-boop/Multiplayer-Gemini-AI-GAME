@@ -2,35 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pro FPS Multiplayer</title>
+    <title>Realistic Multiplayer FPS</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        #overlay { position: absolute; z-index: 100; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .menu-card { background: #222; padding: 30px; border-radius: 15px; border: 1px solid #444; text-align: center; }
-        input { padding: 12px; margin: 10px; border-radius: 5px; border: none; width: 250px; }
-        button { padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        #hud { position: absolute; bottom: 30px; left: 30px; color: white; pointer-events: none; z-index: 10; text-shadow: 2px 2px #000; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #0f0; border-radius: 50%; transform: translate(-50%, -50%); z-index: 20; opacity: 0.8; }
+        #overlay { position: absolute; z-index: 100; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .menu-card { background: #1a1a1a; padding: 40px; border-radius: 20px; border: 2px solid #333; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,1); }
+        input { padding: 15px; margin: 10px; border-radius: 8px; border: 1px solid #444; width: 280px; background: #000; color: #0f0; }
+        button { padding: 15px 30px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        button:hover { background: #1d4ed8; transform: scale(1.05); }
+        #hud { position: absolute; bottom: 40px; left: 40px; color: white; pointer-events: none; z-index: 10; font-weight: bold; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); z-index: 20; opacity: 0.6; }
     </style>
 </head>
 <body>
 
     <div id="overlay">
         <div class="menu-card">
-            <h1>ELITE STRIKE 3D</h1>
-            <p>Your ID: <b id="my-id" style="color: #0f0;">Connecting...</b></p>
-            <input type="text" id="join-id" placeholder="Paste Friend's ID">
-            <button id="btn-join">JOIN FRIEND</button>
-            <hr style="margin: 20px; opacity: 0.2;">
-            <button id="btn-solo" style="background: #555;">PLAY SOLO / HOST</button>
-            <p style="font-size: 12px; opacity: 0.6;">WASD: Move | Click: Shoot | Q: Build | Space: Jump</p>
+            <h1 style="color:#2563eb">RE-ROYALE FPS</h1>
+            <p>1. Send YOUR ID to your friend:</p>
+            <h2 id="my-id" style="color: #0f0; background: #000; padding: 10px;">Connecting...</h2>
+            <p>2. Paste your friend's ID below:</p>
+            <input type="text" id="join-id" placeholder="Friend ID code">
+            <button id="btn-join">CONNECT & KILL</button>
+            <hr style="margin: 20px; opacity: 0.1;">
+            <button id="btn-solo" style="background: #444;">PLAY SOLO / TEST</button>
         </div>
     </div>
 
     <div id="hud">
-        <h2 style="margin:0;">HP: 100 | KILLS: <span id="kill-val">0</span></h2>
-        <h3 style="margin:0; color: #fbbf24;">AMMO: ∞ | MATS: <span id="mat-val">100</span></h3>
+        <div style="font-size: 30px; color: #ff4444;">HEALTH: <span id="hp-val">100</span></div>
+        <div style="font-size: 20px; color: #fbbf24;">UNLIMITED MATS</div>
     </div>
     <div id="crosshair"></div>
 
@@ -65,66 +67,110 @@
                     friend.rotation.y = data.rot;
                 }
                 if(data.type === 'shoot') spawnBullet(data.pos, data.dir, false);
-                if(data.type === 'build') spawnWall(data.pos, data.rot, false);
+                if(data.type === 'hit') {
+                    hp -= 20;
+                    document.getElementById('hp-val').innerText = hp;
+                    if(hp <= 0) alert("YOU DIED!");
+                }
             });
         }
 
-        // --- ENGINE ---
+        // --- GAME ENGINE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x222233);
-        scene.fog = new THREE.FogExp2(0x222233, 0.01);
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.01);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         camera.rotation.order = 'YXZ';
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.toneMapping = THREE.ReinhardToneMapping;
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
+        // Lights
         scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
         sun.position.set(50, 100, 50);
         sun.castShadow = true;
         scene.add(sun);
 
-        // Map Construction
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+        // Ground
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ color: 0x3d5a3a }));
         floor.rotation.x = -Math.PI/2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Simple Map Buildings
-        for(let i=0; i<15; i++) {
-            const h = 5 + Math.random() * 20;
-            const b = new THREE.Mesh(new THREE.BoxGeometry(8, h, 8), new THREE.MeshStandardMaterial({color: 0x444444}));
-            b.position.set(Math.random()*200-100, h/2, Math.random()*200-100);
-            b.castShadow = true; b.receiveShadow = true;
-            scene.add(b);
+        // --- HUMAN MODEL CREATOR ---
+        function createHuman(color) {
+            const group = new THREE.Group();
+            const skin = new THREE.MeshStandardMaterial({ color: 0xdbb4ad });
+            const clothes = new THREE.MeshStandardMaterial({ color: color });
+            
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.25), skin);
+            head.position.y = 1.65;
+            
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.3), clothes);
+            torso.position.y = 1.1;
+
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), clothes);
+            legL.position.set(-0.2, 0.35, 0);
+            
+            const legR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), clothes);
+            legR.position.set(0.2, 0.35, 0);
+
+            group.add(head, torso, legL, legR);
+            return group;
         }
 
-        // Weapon Viewmodel
-        const gunGroup = new THREE.Group();
-        const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.7), new THREE.MeshStandardMaterial({color: 0x111}));
-        gunBody.position.set(0.3, -0.25, -0.5);
-        gunGroup.add(gunBody);
-        camera.add(gunGroup);
-        scene.add(camera);
-
-        // Friend Player Model
-        const friend = new THREE.Group();
-        const fBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.2), new THREE.MeshStandardMaterial({color: 0x00ff00}));
-        fBody.position.y = 0.9;
-        friend.add(fBody);
+        const friend = createHuman(0x3b82f6);
         friend.visible = false;
         scene.add(friend);
 
+        // Gun Model
+        const gun = new THREE.Group();
+        const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.8), new THREE.MeshStandardMaterial({color:0x222}));
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.15), new THREE.MeshStandardMaterial({color:0x222}));
+        grip.position.set(0, -0.2, 0.2);
+        gun.add(barrel, grip);
+        gun.position.set(0.3, -0.3, -0.5);
+        camera.add(gun);
+        scene.add(camera);
+
         // Gameplay Logic
-        let bullets = [], mats = 100, kills = 0;
+        let bullets = [], hp = 100;
         let keys = {}, velocity = new THREE.Vector3();
 
-        window.onkeydown = e => keys[e.code] = true;
+        function spawnBullet(pos, dir, isLocal) {
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.08), new THREE.MeshBasicMaterial({color: 0xffff00}));
+            b.position.copy(pos);
+            const moveVec = new THREE.Vector3(dir.x, dir.y, dir.z).multiplyScalar(2.0);
+            b.userData.vel = moveVec;
+            b.userData.isLocal = isLocal;
+            bullets.push(b);
+            scene.add(b);
+
+            if(isLocal && conn && conn.open) conn.send({type: 'shoot', pos: pos, dir: dir});
+        }
+
+        window.onclick = () => {
+            if(!document.pointerLockElement) return;
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            spawnBullet(camera.position, dir, true);
+            gun.position.z += 0.1; // Recoil
+        };
+
+        window.onkeydown = e => {
+            keys[e.code] = true;
+            if(e.code === 'KeyQ') { // Unlimited Walls
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.4), new THREE.MeshStandardMaterial({color: 0x8b4513}));
+                const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+                wall.position.addVectors(camera.position, dir.multiplyScalar(4));
+                wall.position.y = 1.5;
+                wall.rotation.y = camera.rotation.y;
+                scene.add(wall);
+            }
+        };
         window.onkeyup = e => keys[e.code] = false;
 
         document.addEventListener('mousemove', e => {
@@ -135,44 +181,7 @@
             }
         });
 
-        function spawnBullet(pos, dir, isLocal) {
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.08), new THREE.MeshBasicMaterial({color: 0xffff00}));
-            b.position.copy(pos);
-            b.userData.vel = new THREE.Vector3(dir.x, dir.y, dir.z).multiplyScalar(2.5);
-            bullets.push(b);
-            scene.add(b);
-            if(isLocal && conn && conn.open) conn.send({type: 'shoot', pos: pos, dir: dir});
-        }
-
-        function spawnWall(pos, rot, isLocal) {
-            const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.5), new THREE.MeshStandardMaterial({color: 0x8b4513}));
-            wall.position.copy(pos);
-            wall.rotation.y = rot;
-            scene.add(wall);
-            if(isLocal && conn && conn.open) conn.send({type: 'build', pos: pos, rot: rot});
-        }
-
-        window.onclick = () => {
-            if(!document.pointerLockElement) return;
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            spawnBullet(camera.position, dir, true);
-            // Kickback effect
-            gunGroup.position.z += 0.05;
-        };
-
-        window.onkeydown = e => {
-            keys[e.code] = true;
-            if(e.code === 'KeyQ' && mats >= 10) {
-                const dir = new THREE.Vector3();
-                camera.getWorldDirection(dir);
-                const pos = new THREE.Vector3().addVectors(camera.position, dir.multiplyScalar(4));
-                spawnWall(new THREE.Vector3(pos.x, 1.5, pos.z), camera.rotation.y, true);
-                mats -= 10; document.getElementById('mat-val').innerText = mats;
-            }
-        };
-
-        camera.position.y = 2;
+        camera.position.y = 1.7;
 
         function animate() {
             requestAnimationFrame(animate);
@@ -187,13 +196,7 @@
                 if (keys['KeyA']) camera.position.addScaledVector(side, 0.15);
                 if (keys['KeyD']) camera.position.addScaledVector(side, -0.15);
 
-                if (keys['Space'] && camera.position.y <= 2.1) velocity.y = 0.2;
-                camera.position.y += velocity.y;
-                velocity.y -= 0.01;
-                if(camera.position.y < 2) { camera.position.y = 2; velocity.y = 0; }
-
-                // Weapon sway/recovery
-                gunGroup.position.z += (0 - gunGroup.position.z) * 0.1;
+                gun.position.z += ( -0.5 - gun.position.z) * 0.1;
 
                 if (conn && conn.open) {
                     conn.send({type: 'move', x: camera.position.x, y: camera.position.y, z: camera.position.z, rot: camera.rotation.y});
@@ -202,7 +205,12 @@
 
             bullets.forEach((b, i) => {
                 b.position.add(b.userData.vel);
-                if (b.position.distanceTo(camera.position) > 300) { scene.remove(b); bullets.splice(i, 1); }
+                // Hit detection for friend
+                if (b.userData.isLocal && b.position.distanceTo(friend.position) < 1.5 && friend.visible) {
+                    if (conn && conn.open) conn.send({type: 'hit'});
+                    scene.remove(b); bullets.splice(i, 1);
+                }
+                if (b.position.length() > 500) { scene.remove(b); bullets.splice(i, 1); }
             });
 
             renderer.render(scene, camera);
